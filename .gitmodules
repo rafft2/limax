@@ -1,0 +1,3 @@
+[submodule "external/nom"]
+	path = external/nom
+	url = https://github.com/rafft2/nom.git
