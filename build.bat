@@ -9,7 +9,7 @@ IF "%1"=="release" (
     set build_settings=%build_settings% -O2i
 ) ELSE (
     :: DEBUG BUILD
-    set build_settings=%build_settings% -Odi -Zi -DNOM_ENABLE_ASSERT -wd4100 -wd4820 -wd4189 -wd5045 -wd4005 -wd4668 -wd4702 -wd4201 -wd5246 -wd4191 -wd4127
+    set build_settings=%build_settings% -Odi -Zi -DNOM_ENABLE_ASSERT -wd4100 -wd4820 -wd4189 -wd5045 -wd4005 -wd4668 -wd4702 -wd4201 -wd5246 -wd4191 -wd4127 -wd4514
 )
 
 cl "src\limax.cpp" /I "external\nom" /I "external\stb" %build_settings% %build_output%
