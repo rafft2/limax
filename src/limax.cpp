@@ -9,31 +9,6 @@
 
 #include "nom.h"
 
-vec3 ScreenFromView(vec3 pos, f32 znear)
-{
-    vec3 result;
-    result.x = (pos.x * znear) / (-pos.z);
-    result.y = (pos.y * znear) / (-pos.z);
-    result.z = -pos.z;
-    return(result);
-}
-
-vec2 NDCFromScreen(vec3 pos)
-{
-    vec2 result;
-    result.x = (pos.x + 1) / 2;
-    result.y = (pos.y + 1) / 2;
-    return(result);
-}
-
-vec2i RasterFromNDC(vec2 pos, s32 width, s32 height)
-{
-    vec2i result;
-    result.x = (s32)(pos.x * ((f32)width - 1.0f));
-    result.y = (s32)(pos.y * ((f32)height - 1.0f));
-    return(result);
-}
-
 struct image
 {
     u8 *framebuffer;
@@ -102,18 +77,42 @@ void WriteImageToFile(image *img, const char *filename)
     }
 }
 
+vec3 RasterFromView(vec3 p, f32 left, f32 right, f32 bottom, f32 top, f32 znear, s32 image_width, s32 image_height)
+{
+    vec3 raster;
+
+    // screen from view
+    raster.x = (p.x * znear) / -p.z;
+    raster.y = (p.y * znear) / -p.z;
+    raster.z = -p.z;
+
+    // NDC from screen (here NDC is [-1, +1])
+    raster.x = ((2.0f * raster.x) / (right - left)) - ((right + left) / (right - left));
+    raster.y = ((2.0f * raster.y) / (top - bottom)) - ((top + bottom) / (top - bottom));
+
+    // raster from NDC
+    raster.x = ((raster.x + 1.0f) / 2.0f) * ((f32)image_width - 1.0f);
+    raster.y = ((raster.y + 1.0f) / 2.0f) * ((f32)image_height - 1.0f);;
+
+    return(raster);
+}
+
 int main(void)
 {
     s32 image_width = 204;
     s32 image_height = 155;
 
     f32 aspect_ratio = (f32)image_width / (f32)image_height;
-    f32 znear = 0.5f;
+    f32 znear = 0.1f;
     f32 zfar = 100.0f;
 
     f32 vertical_fov_degrees = 90.0f;
     f32 vertical_canvas_size = 2.0f * tanf(DEG2RAD(vertical_fov_degrees) / 2.0f) * znear;
     f32 horizontal_canvas_size = vertical_canvas_size * aspect_ratio;
+    f32 top = vertical_canvas_size / 2.0f;
+    f32 bottom = -top;
+    f32 right = horizontal_canvas_size / 2.0f;
+    f32 left = -right;
 
     image img = CreateImage(image_width, image_height);
 
@@ -122,13 +121,14 @@ int main(void)
     vec3 A = { 0.0f, 0.5f, 2.0f };
     vec3 B = { -0.5f, -0.5f, 2.0f };
     vec3 C = { 0.5f, -0.5f, 2.0f };
-    vec2i Aprime = RasterFromNDC(NDCFromScreen(ScreenFromView(A, znear)), image_width, image_height);
-    vec2i Bprime = RasterFromNDC(NDCFromScreen(ScreenFromView(B, znear)), image_width, image_height);
-    vec2i Cprime = RasterFromNDC(NDCFromScreen(ScreenFromView(C, znear)), image_width, image_height);
 
-    WritePixel(&img, Aprime.x, Aprime.y, 255, 255, 255);
-    WritePixel(&img, Bprime.x, Bprime.y, 255, 255, 255);
-    WritePixel(&img, Cprime.x, Cprime.y, 255, 255, 255);
+    vec3 Aprime = RasterFromView(A, left, right, bottom, top, znear, image_width, image_height);
+    vec3 Bprime = RasterFromView(B, left, right, bottom, top, znear, image_width, image_height);
+    vec3 Cprime = RasterFromView(C, left, right, bottom, top, znear, image_width, image_height);
+
+    WritePixel(&img, (s32)Aprime.x, (s32)Aprime.y, 255, 255, 255);
+    WritePixel(&img, (s32)Bprime.x, (s32)Bprime.y, 255, 255, 255);
+    WritePixel(&img, (s32)Cprime.x, (s32)Cprime.y, 255, 255, 255);
 
     WriteImageToFile(&img, "out.png");
 
