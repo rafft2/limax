@@ -96,18 +96,19 @@ void WriteImageToFile(image *img, const char *filename)
     }
 }
 
-vec3 RasterFromView(vec3 p, f32 left, f32 right, f32 bottom, f32 top, f32 znear, s32 image_width, s32 image_height)
+vec3 RasterFromView(vec3 p, f32 vertical_fov_degrees, s32 image_width, s32 image_height, f32 znear, f32 zfar)
 {
     vec3 raster = { FLT_MAX, FLT_MAX, FLT_MAX };
 
-    // screen from view
-    raster.x = (p.x * znear) / -p.z;
-    raster.y = (p.y * znear) / -p.z;
-    raster.z = -p.z;
-
-    // NDC from screen (here NDC is [-1, +1])
-    raster.x = ((2.0f * raster.x) / (right - left)) - ((right + left) / (right - left));
-    raster.y = ((2.0f * raster.y) / (top - bottom)) - ((top + bottom) / (top - bottom));
+    // ndc from view
+    mat4x4 view  = Translation(-1.0f, 0.0f, 1.0f);
+    f32 aspect_ratio = (f32)image_width / (f32)image_height;
+    #if 1
+    mat4x4 proj = CreatePerspectiveProjection(DEG2RAD(vertical_fov_degrees), aspect_ratio, znear, zfar);
+    #else
+    mat4x4 proj = CreateOrthographicProjection(znear, 100.0f, -2.0f, 2.0f, -2.0f, 2.0f);
+    #endif
+    raster = view * proj * p;
 
     // raster from NDC
     raster.x = ((raster.x + 1.0f) / 2.0f) * ((f32)image_width - 1.0f);
@@ -272,18 +273,18 @@ triangle_mesh CreateMeshFromFile(const char *filename)
     return(mesh);
 }
 
-void DrawMesh(image *img, triangle_mesh *mesh, f32 left, f32 right, f32 bottom, f32 top, f32 znear)
+void DrawMesh(image *img, triangle_mesh *mesh, f32 vertical_fov_degrees, s32 image_width, s32 image_height, f32 znear, f32 zfar)
 {
-    mat4x4 transform = Scaling(0.2f) * RotationY(-45.0f) * Translation(0.0f, 0.0f, -1.5f);
+    mat4x4 transform = Scaling(0.2f) * RotationY(DEG2RAD(-45.0f)) * Translation(0.0f, 0.0f, -1.5f);
     for(u32 i = 0; i < mesh->index_count; i+=3)
     {
         u32 idx0 = mesh->indices[i]; 
         u32 idx1 = mesh->indices[i + 1];
         u32 idx2 = mesh->indices[i + 2];
 
-        vec3 V0 = RasterFromView(transform * mesh->vertices[idx0], left, right, bottom, top, znear, img->width, img->height);
-        vec3 V1 = RasterFromView(transform * mesh->vertices[idx1], left, right, bottom, top, znear, img->width, img->height);
-        vec3 V2 = RasterFromView(transform * mesh->vertices[idx2], left, right, bottom, top, znear, img->width, img->height);
+        vec3 V0 = RasterFromView(transform * mesh->vertices[idx0], vertical_fov_degrees, image_width, image_height, znear, zfar);
+        vec3 V1 = RasterFromView(transform * mesh->vertices[idx1], vertical_fov_degrees, image_width, image_height, znear, zfar);
+        vec3 V2 = RasterFromView(transform * mesh->vertices[idx2], vertical_fov_degrees, image_width, image_height, znear, zfar);
 
         DrawTriangle(img, V0, V1, V2);
     }
@@ -291,27 +292,20 @@ void DrawMesh(image *img, triangle_mesh *mesh, f32 left, f32 right, f32 bottom, 
 
 int main(void)
 {
-    s32 image_width = 1920;
-    s32 image_height = 1080;
+    s32 image_width = 2560;
+    s32 image_height = 1440;
 
+    f32 vertical_fov_degrees = 90.0f;
     f32 aspect_ratio = (f32)image_width / (f32)image_height;
     f32 znear = 0.1f;
     f32 zfar = 100.0f;
-
-    f32 vertical_fov_degrees = 90.0f;
-    f32 vertical_canvas_size = 2.0f * tanf(DEG2RAD(vertical_fov_degrees) / 2.0f) * znear;
-    f32 horizontal_canvas_size = vertical_canvas_size * aspect_ratio;
-    f32 top = vertical_canvas_size / 2.0f;
-    f32 bottom = -top;
-    f32 right = horizontal_canvas_size / 2.0f;
-    f32 left = -right;
 
     image img = CreateImage(image_width, image_height);
 
     ClearScreen(&img, (u8)(background_color.x * 255), (u8)(background_color.y * 255), (u8)(background_color.z * 255));
 
     triangle_mesh cow = CreateMeshFromFile("assets/cow.obj");
-    DrawMesh(&img, &cow, left, right, bottom, top, znear);
+    DrawMesh(&img, &cow, vertical_fov_degrees, image_width, image_height, znear, zfar);
 
     WriteImageToFile(&img, "out.png");
 
